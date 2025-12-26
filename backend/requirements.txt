@@ -1,0 +1,35 @@
+# Trendyol Profitability SaaS - Backend Requirements
+# Python 3.11+ recommended
+
+# Django & REST Framework
+Django>=5.0,<5.2
+djangorestframework>=3.14,<4.0
+djangorestframework-simplejwt>=5.3,<6.0
+django-cors-headers>=4.3,<5.0
+django-filter>=23.0,<25.0
+
+# Database
+psycopg[binary]>=3.1.0
+
+# Async Tasks
+celery>=5.3,<6.0
+redis>=5.0,<6.0
+django-celery-beat>=2.6,<3.0
+
+# Security & Utils
+cryptography>=41.0,<45.0
+python-dotenv>=1.0,<2.0
+
+# HTTP Requests
+requests>=2.31,<3.0
+aiohttp>=3.9,<4.0
+
+# Excel Processing
+openpyxl>=3.1,<4.0
+xlsxwriter>=3.1,<4.0
+
+# Date/Time
+python-dateutil>=2.8,<3.0
+
+# Production Server
+gunicorn>=21.0,<23.0
