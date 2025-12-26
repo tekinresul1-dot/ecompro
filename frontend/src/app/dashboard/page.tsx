@@ -447,6 +447,171 @@ export default function DashboardPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Today's Ordered Products Section */}
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-orange-400 to-orange-500 px-6 py-4 flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-white">
+                            Bugün Sipariş Alan Ürünler
+                            <span className="text-orange-100 text-sm font-normal ml-2">
+                                (Maliyeti eksik ürünler kârlılık hesaplamasına dahil edilememektedir!)
+                            </span>
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <button className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                Filtrele ▼
+                            </button>
+                            <button className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm">
+                                A+
+                            </button>
+                            <span className="bg-white text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+                                100%
+                            </span>
+                            <button className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm">
+                                A-
+                            </button>
+                            <button className="bg-slate-700 hover:bg-slate-800 text-white p-1.5 rounded-lg">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div className="p-6">
+                        {dashboardData?.today_orders?.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-200">
+                                            <th className="text-left py-3 px-4 font-medium text-slate-600">Ürün</th>
+                                            <th className="text-left py-3 px-4 font-medium text-slate-600">Barkod</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Satış Fiyatı</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Maliyet</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Kâr</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Marj %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dashboardData.today_orders.map((order: any) => (
+                                            <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-3 px-4">
+                                                    <p className="font-medium text-slate-800 truncate max-w-xs">{order.product_name}</p>
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-600 font-mono text-sm">{order.barcode}</td>
+                                                <td className="py-3 px-4 text-right text-slate-800">{formatCurrency(order.sale_price)}</td>
+                                                <td className="py-3 px-4 text-right text-slate-600">{formatCurrency(order.cost)}</td>
+                                                <td className={`py-3 px-4 text-right font-semibold ${order.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {formatCurrency(order.profit)}
+                                                </td>
+                                                <td className={`py-3 px-4 text-right font-medium ${order.margin >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {formatPercent(order.margin)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <p className="text-slate-400 text-lg">Veri yok!</p>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200 text-sm text-slate-500">
+                            <div className="flex gap-4">
+                                <span>Geçerli sayfa: <strong className="text-slate-700">1</strong></span>
+                                <span>Toplam kayıt sayısı: <strong className="text-primary-600">{dashboardData?.today_orders?.length || 0}</strong></span>
+                            </div>
+                            <span>Sayfa başına gösterilen kayıt sayısı: <strong>50</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Order Profitability Analysis Section */}
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="bg-gradient-to-r from-orange-400 to-orange-500 px-6 py-4 flex items-center justify-between">
+                        <h2 className="text-lg font-semibold text-white">
+                            Sipariş Kârlılık Analizi
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <button className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                Filtrele ▼
+                            </button>
+                            <button className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm">
+                                A+
+                            </button>
+                            <span className="bg-white text-slate-700 px-3 py-1.5 rounded-lg text-sm font-medium">
+                                85%
+                            </span>
+                            <button className="bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm">
+                                A-
+                            </button>
+                            <button className="bg-slate-700 hover:bg-slate-800 text-white p-1.5 rounded-lg">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div className="px-6 pt-2 pb-4 flex justify-end">
+                        <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Raporu İndir
+                        </button>
+                    </div>
+                    <div className="p-6 pt-0">
+                        {dashboardData?.order_analysis?.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b border-slate-200">
+                                            <th className="text-left py-3 px-4 font-medium text-slate-600">Sipariş No</th>
+                                            <th className="text-left py-3 px-4 font-medium text-slate-600">Tarih</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Ürün Sayısı</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Toplam Satış</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Toplam Maliyet</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Net Kâr</th>
+                                            <th className="text-right py-3 px-4 font-medium text-slate-600">Kâr Marjı</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {dashboardData.order_analysis.map((order: any) => (
+                                            <tr key={order.order_number} className="border-b border-slate-100 hover:bg-slate-50">
+                                                <td className="py-3 px-4">
+                                                    <Link href={`/orders/${order.id}`} className="font-medium text-primary-600 hover:underline">
+                                                        {order.order_number}
+                                                    </Link>
+                                                </td>
+                                                <td className="py-3 px-4 text-slate-600">{formatDate(order.order_date)}</td>
+                                                <td className="py-3 px-4 text-right text-slate-800">{order.item_count}</td>
+                                                <td className="py-3 px-4 text-right text-slate-800">{formatCurrency(order.total_sale)}</td>
+                                                <td className="py-3 px-4 text-right text-slate-600">{formatCurrency(order.total_cost)}</td>
+                                                <td className={`py-3 px-4 text-right font-semibold ${order.net_profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {formatCurrency(order.net_profit)}
+                                                </td>
+                                                <td className={`py-3 px-4 text-right font-medium ${order.profit_margin >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                    {formatPercent(order.profit_margin)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="text-center py-12">
+                                <p className="text-slate-400 text-lg">Veri yok!</p>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200 text-sm text-slate-500">
+                            <div className="flex gap-4">
+                                <span>Geçerli sayfa: <strong className="text-slate-700">1</strong></span>
+                                <span>Toplam kayıt sayısı: <strong className="text-primary-600">{dashboardData?.order_analysis?.length || 0}</strong></span>
+                            </div>
+                            <span>Sayfa başına gösterilen kayıt sayısı: <strong>50</strong></span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </DashboardLayout>
     );
