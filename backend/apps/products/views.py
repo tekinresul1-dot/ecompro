@@ -279,9 +279,9 @@ class ProductExportView(APIView):
         
         # Headers
         headers = [
-            'Barkod', 'Model Kodu', 'Ürün Adı', 'Marka', 'Kategori',
-            'Maliyet (KDV Hariç)', 'Alış KDV %', 'Satış KDV %', 'Komisyon %',
-            'Mağaza'
+            'Barkod', 'Model Kodu', 'Ürün Adı', 'Marka', 'Kategori', 'Görsel Linki',
+            'Ürün Maliyeti (KDV Dahil)', 'Maliyet (KDV Hariç)', 'Maliyet KDV Oranı', 
+            'Satış KDV Oranı', 'Komisyon Oranı', 'Mağaza'
         ]
         for col, header in enumerate(headers, 1):
             ws.cell(row=1, column=col, value=header)
@@ -293,11 +293,19 @@ class ProductExportView(APIView):
             ws.cell(row=row, column=3, value=product.title)
             ws.cell(row=row, column=4, value=product.brand)
             ws.cell(row=row, column=5, value=product.category)
-            ws.cell(row=row, column=6, value=float(product.product_cost_excl_vat) if product.product_cost_excl_vat else None)
-            ws.cell(row=row, column=7, value=float(product.purchase_vat_rate))
-            ws.cell(row=row, column=8, value=float(product.sales_vat_rate))
-            ws.cell(row=row, column=9, value=float(product.commission_rate) if product.commission_rate else None)
-            ws.cell(row=row, column=10, value=product.seller_account.shop_name)
+            ws.cell(row=row, column=6, value=product.image_url)
+            
+            # Calculate Cost Inc VAT
+            cost_excl = float(product.product_cost_excl_vat) if product.product_cost_excl_vat else 0
+            vat_rate = float(product.purchase_vat_rate) if product.purchase_vat_rate else 0
+            cost_inc = cost_excl * (1 + vat_rate / 100)
+            
+            ws.cell(row=row, column=7, value=cost_inc if cost_excl > 0 else None)
+            ws.cell(row=row, column=8, value=cost_excl if cost_excl > 0 else None)
+            ws.cell(row=row, column=9, value=vat_rate)
+            ws.cell(row=row, column=10, value=float(product.sales_vat_rate))
+            ws.cell(row=row, column=11, value=float(product.commission_rate) if product.commission_rate else None)
+            ws.cell(row=row, column=12, value=product.seller_account.shop_name)
         
         # Auto-width columns
         for col in range(1, len(headers) + 1):
@@ -311,3 +319,85 @@ class ProductExportView(APIView):
         wb.save(response)
         
         return response
+
+class ProductUpdateFromExcelView(APIView):
+    """
+    Update product details (Image, Brand) from standard Trendyol Excel export.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    def post(self, request):
+        import openpyxl
+        
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'success': False, 'message': 'Dosya yüklenmedi.'}, status=400)
+            
+        try:
+            wb = openpyxl.load_workbook(file_obj, data_only=True)
+            ws = wb.active
+            
+            # Map headers
+            header_map = {}
+            for cell in ws[1]:
+                if cell.value:
+                    header_map[str(cell.value).strip()] = cell.column - 1
+            
+            required = ['Barkod']
+            missing = [h for h in required if h not in header_map]
+            if missing:
+                 return Response({'success': False, 'message': f'Eksik sütunlar: {", ".join(missing)}. "Barkod" sütunu gereklidir.'}, status=400)
+            
+            col_barcode = header_map['Barkod']
+            # Try to find Image and Brand columns
+            col_image = header_map.get('Görsel Linki') or header_map.get('Görsel Linkleri') or header_map.get('Görsel 1')
+            col_brand = header_map.get('Marka')
+            
+            updated_count = 0
+            
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                raw_barcode = row[col_barcode]
+                if not raw_barcode:
+                    continue
+                
+                # Clean barcode (handle float from Excel)
+                barcode = str(raw_barcode).strip()
+                if barcode.endswith('.0'):
+                    barcode = barcode[:-2]
+                    
+                updates = {}
+                
+                # Image
+                if col_image is not None and row[col_image]:
+                     img_url = str(row[col_image]).strip()
+                     # If multiple images (comma separated or newline), take first
+                     if ',' in img_url:
+                          img_url = img_url.split(',')[0].strip()
+                     if '\n' in img_url:
+                          img_url = img_url.split('\n')[0].strip()
+                     if img_url:
+                          updates['image_url'] = img_url
+                
+                # Brand
+                if col_brand is not None and row[col_brand]:
+                     brand = str(row[col_brand]).strip()
+                     if brand:
+                          updates['brand'] = brand
+                          
+                if updates:
+                     # Update matching products
+                     Product.objects.filter(
+                         seller_account__user=request.user, 
+                         barcode=barcode
+                     ).update(**updates)
+                     updated_count += 1
+                     
+            return Response({
+                'success': True, 
+                'message': f'{updated_count} ürün bilgisi Excel\'den güncellendi.'
+            })
+            
+        except Exception as e:
+            # Handle specific openpyxl errors or generic
+            return Response({'success': False, 'message': f'Dosya işlenirken hata: {str(e)}'}, status=400)

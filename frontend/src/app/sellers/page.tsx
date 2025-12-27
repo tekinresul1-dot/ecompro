@@ -34,7 +34,11 @@ export default function SellersPage() {
         },
     });
 
-    const sellerList = sellers?.data || [];
+    // Handle different API response formats
+    const sellerData = sellers?.data;
+    const sellerList = Array.isArray(sellerData)
+        ? sellerData
+        : sellerData?.results || sellerData?.data || [];
 
     return (
         <DashboardLayout>
@@ -170,7 +174,26 @@ function AddSellerModal({ onClose }: { onClose: () => void }) {
             onClose();
         },
         onError: (err: any) => {
-            setError(err.response?.data?.error?.message || 'Hesap eklenemedi.');
+            console.error('Create seller error:', err.response?.data);
+            // Try to extract detailed error message
+            const errorData = err.response?.data;
+            let errorMessage = 'Hesap eklenemedi.';
+
+            if (errorData?.error?.message) {
+                errorMessage = errorData.error.message;
+            } else if (errorData?.detail) {
+                errorMessage = errorData.detail;
+            } else if (errorData?.message) {
+                errorMessage = errorData.message;
+            } else if (typeof errorData === 'object') {
+                // Handle field-level errors
+                const fieldErrors = Object.entries(errorData)
+                    .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+                    .join('; ');
+                if (fieldErrors) errorMessage = fieldErrors;
+            }
+
+            setError(errorMessage);
         },
     });
 

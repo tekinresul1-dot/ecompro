@@ -66,6 +66,34 @@ class Product(TimestampMixin, models.Model):
         blank=True
     )
     
+    # Additional product details
+    image_url = models.URLField(
+        _('Ürün Görseli URL'),
+        max_length=500,
+        blank=True
+    )
+    color = models.CharField(
+        _('Renk'),
+        max_length=100,
+        blank=True
+    )
+    size = models.CharField(
+        _('Beden'),
+        max_length=50,
+        blank=True
+    )
+    desi = models.DecimalField(
+        _('Desi'),
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+    stock = models.PositiveIntegerField(
+        _('Stok'),
+        default=0
+    )
+    
     # Cost information (KDV hariç / excluding VAT)
     product_cost_excl_vat = models.DecimalField(
         _('Ürün Maliyeti (KDV Hariç)'),

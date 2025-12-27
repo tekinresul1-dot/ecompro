@@ -18,6 +18,7 @@ class ProductSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'barcode', 'product_code', 'trendyol_product_id',
             'title', 'brand', 'category', 'category_id',
+            'image_url', 'color', 'size', 'desi', 'stock',
             'product_cost_excl_vat', 'product_cost_incl_vat',
             'purchase_vat_rate', 'sales_vat_rate',
             'commission_rate', 'effective_commission_rate',

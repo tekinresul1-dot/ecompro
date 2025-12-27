@@ -13,6 +13,7 @@ from .views import (
     BulkCostUploadListView,
     ProductsWithoutCostView,
     ProductExportView,
+    ProductUpdateFromExcelView,
 )
 
 app_name = 'products'
@@ -28,6 +29,7 @@ urlpatterns = [
     path('bulk-upload/', BulkCostUploadView.as_view(), name='bulk_upload'),
     path('bulk-upload/<int:pk>/status/', BulkCostUploadStatusView.as_view(), name='bulk_upload_status'),
     path('bulk-uploads/', BulkCostUploadListView.as_view(), name='bulk_upload_list'),
+    path('update-from-excel/', ProductUpdateFromExcelView.as_view(), name='update_from_excel'),
     
     # Special views
     path('without-cost/', ProductsWithoutCostView.as_view(), name='without_cost'),

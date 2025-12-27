@@ -54,12 +54,34 @@ LOGGING = {
 }
 
 # For development, use a fixed encryption key (NEVER do this in production!)
-if not ENCRYPTION_KEY:
+if not ENCRYPTION_KEY or len(ENCRYPTION_KEY) < 32:
     # This is only for development - generate a proper key for production
-    ENCRYPTION_KEY = 'dev-only-encryption-key-change-in-prod'
+    # Must be at least 32 characters for security
+    ENCRYPTION_KEY = 'dev-only-encryption-key-12345678901234567890'
 
 # CORS - Allow all origins in development
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'x-request-time',
+]
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # Disable password validators in development for easier testing
 AUTH_PASSWORD_VALIDATORS = []

@@ -357,18 +357,53 @@ class OrderItem(models.Model):
         """
         from apps.products.models import Product
         
+        # Extract VAT from raw data
+        vat_rate_val = self.raw_data.get('vatBase', 0)
+        try:
+            vat_rate = int(vat_rate_val)
+        except:
+            vat_rate = 0
+            
+        content_id = str(self.raw_data.get('contentId', '') or self.raw_data.get('productCode', ''))
+        
+        defaults = {
+            'product_code': self.product_code,
+            'title': self.product_name,
+            'trendyol_product_id': content_id,
+            'image_url': '',
+            'brand': '',
+            'sales_vat_rate': vat_rate,
+            'purchase_vat_rate': vat_rate, # Default assumption
+        }
+        
         product, created = Product.objects.get_or_create(
             seller_account=self.order.seller_account,
             barcode=self.barcode,
-            defaults={
-                'product_code': self.product_code,
-                'title': self.product_name,
-            }
+            defaults=defaults
         )
         
-        if not created and not product.title:
-            product.title = self.product_name
-            product.save(update_fields=['title'])
+        if not created:
+            updates = []
+            if not product.title:
+                product.title = self.product_name
+                updates.append('title')
+            
+            # Recover ID if missing
+            if not product.trendyol_product_id and content_id:
+                product.trendyol_product_id = content_id
+                updates.append('trendyol_product_id')
+                
+            # Update VAT if missing
+            if product.sales_vat_rate == 0 and vat_rate > 0:
+                product.sales_vat_rate = vat_rate
+                updates.append('sales_vat_rate')
+                
+            if product.purchase_vat_rate == 0 and vat_rate > 0:
+                 product.purchase_vat_rate = vat_rate
+                 updates.append('purchase_vat_rate')
+            
+            if updates:
+                product.save(update_fields=updates)
         
         self.product = product
         self.save(update_fields=['product'])

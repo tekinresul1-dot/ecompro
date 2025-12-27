@@ -110,26 +110,100 @@ class TriggerSyncView(APIView):
         serializer = TriggerSyncSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Queue the sync task
-        from apps.integrations.tasks import sync_seller_orders
-        sync_seller_orders.delay(
-            seller_id=seller.id,
-            sync_type=serializer.validated_data.get('sync_type', 'incremental'),
-            start_date=serializer.validated_data.get('start_date'),
-            end_date=serializer.validated_data.get('end_date'),
-        )
-        
         # Update status
         seller.mark_sync_started()
         
-        return Response({
-            'success': True,
-            'message': 'Senkronizasyon başlatıldı.',
-            'data': {
-                'seller_id': seller.id,
-                'sync_status': seller.sync_status,
-            }
-        })
+        # Import settings to check DEBUG mode
+        from django.conf import settings
+        
+        sync_type = serializer.validated_data.get('sync_type', 'incremental')
+        start_date = serializer.validated_data.get('start_date')
+        end_date = serializer.validated_data.get('end_date')
+        
+        if settings.DEBUG:
+            # Run synchronously in development (no Celery/Redis needed)
+            try:
+                from apps.integrations.trendyol.sync_service import OrderSyncService, ProductSyncService
+                
+                # 1. Sync Products (Full details: images, brand, category, etc.)
+                # This might fail if API key doesn't have product permissions
+                products_result = {'products_synced': 0}
+                product_sync_error = None
+                
+                try:
+                    product_service = ProductSyncService(seller)
+                    products_result = product_service.sync_products()
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Product sync failed: {str(e)}")
+                    product_sync_error = str(e)
+                
+                # 2. Sync Orders
+                order_service = OrderSyncService(seller)
+                orders_fetched, orders_created, orders_updated = order_service.sync_orders(
+                    sync_type=sync_type,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                
+                msg = f'Senkronizasyon tamamlandı. {orders_fetched} sipariş çekildi.'
+                if products_result['products_synced'] > 0:
+                    msg += f' {products_result["products_synced"]} ürün detayları güncellendi.'
+                elif product_sync_error:
+                    msg += f' (Ürün senkronizasyonu uyarısı: {product_sync_error})'
+                
+                # 3. Enrich Products from Web (Fallback)
+                try:
+                    # Provide robustness: try to enrich missing details (images/brands)
+                    # even if API failed or returned partial data
+                    enrich_service = ProductSyncService(seller)
+                    enriched_count = enrich_service.enrich_products_from_web()
+                    if enriched_count > 0:
+                        msg += f' {enriched_count} eksik ürün için bilgiler web\'den tamamlandı.'
+                except Exception as e:
+                    logger.warning(f"Enrichment failed: {e}")
+                
+                return Response({
+                    'success': True,
+                    'message': msg,
+                    'data': {
+                        'seller_id': seller.id,
+                        'sync_status': seller.sync_status,
+                        'products_synced': products_result.get('products_synced', 0),
+                        'orders_fetched': orders_fetched,
+                        'orders_created': orders_created,
+                        'orders_updated': orders_updated,
+                        'product_sync_error': product_sync_error
+                    }
+                })
+            except Exception as e:
+                import traceback
+                error_detail = traceback.format_exc()
+                logger_msg = f'Sync error: {str(e)}\n{error_detail}'
+                seller.mark_sync_failed(str(e))
+                return Response({
+                    'success': False,
+                    'message': f'Senkronizasyon hatası: {str(e)}'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            # Queue the sync task in production
+            from apps.integrations.tasks import sync_seller_orders
+            sync_seller_orders.delay(
+                seller_id=seller.id,
+                sync_type=sync_type,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            
+            return Response({
+                'success': True,
+                'message': 'Senkronizasyon başlatıldı.',
+                'data': {
+                    'seller_id': seller.id,
+                    'sync_status': seller.sync_status,
+                }
+            })
 
 
 class SellerSyncStatusView(APIView):

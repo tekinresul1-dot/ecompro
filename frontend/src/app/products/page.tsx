@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsAPI, sellersAPI } from '@/lib/api';
 import { formatCurrency, formatPercent } from '@/lib/utils';
@@ -43,6 +43,39 @@ export default function ProductsPage() {
         },
     });
 
+    // Sync mutation
+    const syncMutation = useMutation({
+        mutationFn: (sellerId: number) => sellersAPI.triggerSync(sellerId),
+        onSuccess: (response: any) => {
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['sellers'] });
+
+            // Show result message
+            const data = response.data;
+            let message = data.message;
+            if (data.data?.product_sync_error) {
+                message += ` (Uyarı: ${data.data.product_sync_error})`;
+                alert(message); // Using alert for now, ideally use a Toast component
+            } else {
+                alert(message);
+            }
+        },
+        onError: (error: any) => {
+            alert(`Senkronizasyon hatası: ${error.response?.data?.message || error.message}`);
+        }
+    });
+
+    // Handle sync
+    const handleSync = () => {
+        if (!selectedSeller) {
+            alert('Lütfen önce bir mağaza seçin.');
+            return;
+        }
+        if (confirm('Trendyol\'dan güncel veriler çekilecek. Bu işlem biraz zaman alabilir. Devam edilsin mi?')) {
+            syncMutation.mutate(selectedSeller);
+        }
+    };
+
     // Export handler
     const handleExport = async () => {
         const response = await productsAPI.export(selectedSeller);
@@ -57,7 +90,8 @@ export default function ProductsPage() {
         URL.revokeObjectURL(url);
     };
 
-    const productList = products?.data?.results || products?.data || [];
+    const rawProducts = products?.data?.results || products?.data || [];
+    const productList = Array.isArray(rawProducts) ? rawProducts : [];
 
     // Handle sellers data
     const sellerList = Array.isArray(sellers?.data)
@@ -87,6 +121,25 @@ export default function ProductsPage() {
     const SortIcon = ({ field }: { field: string }) => {
         if (sortField !== field) return null;
         return sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />;
+    };
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const handleExcelUpdate = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (!confirm('Seçilen Excel dosyası ile ürünler (Görsel ve Marka) güncellenecek. Devam edilsin mi?')) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        try {
+            const response = await productsAPI.updateFromExcel(file);
+            alert(response.data.message);
+            queryClient.invalidateQueries({ queryKey: ['products'] });
+        } catch (error: any) {
+            alert(`Hata: ${error.response?.data?.message || 'Yükleme başarısız.'}`);
+        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     // VAT rate options
@@ -134,6 +187,13 @@ export default function ProductsPage() {
                                 </option>
                             ))}
                         </select>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept=".xlsx"
+                            onChange={handleExcelUpdate}
+                        />
 
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -150,11 +210,15 @@ export default function ProductsPage() {
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => refetch()}
-                            className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                            onClick={handleSync}
+                            disabled={syncMutation.isPending}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${syncMutation.isPending
+                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                : 'bg-primary-500 hover:bg-primary-600 text-white'
+                                }`}
                         >
-                            {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-                            Verileri Güncelle
+                            {syncMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                            Trendyol'dan Çek
                         </button>
 
                         <button
@@ -170,9 +234,12 @@ export default function ProductsPage() {
                             Casel ile toplu aktarım
                         </button>
 
-                        <button className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        >
                             <Upload className="w-4 h-4" />
-                            XML Yükle
+                            Excel ile Güncelle
                         </button>
                     </div>
                 </div>
@@ -268,8 +335,8 @@ export default function ProductsPage() {
                                                     <button
                                                         onClick={() => setShowVariants(showVariants === product.id ? null : product.id)}
                                                         className={`w-6 h-6 rounded flex items-center justify-center text-xs font-medium ${showVariants === product.id
-                                                                ? 'bg-primary-500 text-white'
-                                                                : 'bg-orange-100 text-orange-600'
+                                                            ? 'bg-primary-500 text-white'
+                                                            : 'bg-orange-100 text-orange-600'
                                                             }`}
                                                     >
                                                         {product.variant_count || 'V'}
@@ -365,8 +432,8 @@ export default function ProductsPage() {
                                                                 setEditVatRate(product.purchase_vat_rate?.toString() || '18');
                                                             }}
                                                             className={`px-3 py-1 border rounded text-sm transition-colors ${product.has_cost_data
-                                                                    ? 'border-slate-200 bg-white text-slate-700 hover:border-primary-300'
-                                                                    : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                                                ? 'border-slate-200 bg-white text-slate-700 hover:border-primary-300'
+                                                                : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
                                                                 }`}
                                                         >
                                                             {product.has_cost_data
@@ -409,7 +476,7 @@ export default function ProductsPage() {
 
                                             {/* Brand */}
                                             <td className="px-4 py-3 text-slate-600">
-                                                {product.brand || 'Sohvaldi'}
+                                                {product.brand || '---'}
                                             </td>
 
                                             {/* Model Code */}
@@ -439,8 +506,8 @@ export default function ProductsPage() {
                                             <td className="px-4 py-3 text-center">
                                                 {product.return_rate ? (
                                                     <span className={`px-2 py-0.5 rounded text-sm ${product.return_rate > 10
-                                                            ? 'bg-red-50 text-red-600'
-                                                            : 'bg-emerald-50 text-emerald-600'
+                                                        ? 'bg-red-50 text-red-600'
+                                                        : 'bg-emerald-50 text-emerald-600'
                                                         }`}>
                                                         Varyasyonlar ({product.variant_count || 0})
                                                     </span>
@@ -452,8 +519,8 @@ export default function ProductsPage() {
                                             {/* Shipped Today */}
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm ${product.shipped_today
-                                                        ? 'bg-emerald-50 text-emerald-600'
-                                                        : 'bg-slate-100 text-slate-500'
+                                                    ? 'bg-emerald-50 text-emerald-600'
+                                                    : 'bg-slate-100 text-slate-500'
                                                     }`}>
                                                     <span className={`w-2 h-2 rounded-full ${product.shipped_today ? 'bg-emerald-500' : 'bg-slate-400'
                                                         }`}></span>

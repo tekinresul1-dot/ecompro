@@ -101,8 +101,6 @@ const api: AxiosInstance = axios.create({
     },
     // SECURITY: Timeout to prevent hanging requests
     timeout: 30000,
-    // SECURITY: Validate response status
-    validateStatus: (status) => status >= 200 && status < 500,
 });
 
 // SECURITY: Add auth token to requests
@@ -158,6 +156,14 @@ api.interceptors.response.use(
         // Handle authentication errors
         if (error.response?.status === 401 && originalRequest) {
             const refreshToken = tokenStorage.getRefreshToken();
+
+            if (!refreshToken) {
+                tokenStorage.clearTokens();
+                if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+                return Promise.reject(error);
+            }
 
             if (refreshToken && !isRefreshing) {
                 isRefreshing = true;
@@ -344,6 +350,14 @@ export const productsAPI = {
             params: sellerId ? { seller_account: sellerId } : undefined,
             responseType: 'blob',
         }),
+
+    updateFromExcel: (file: File) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return api.post('/products/update-from-excel/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    },
 };
 
 // Orders API
